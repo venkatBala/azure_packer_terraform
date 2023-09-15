@@ -1,0 +1,33 @@
+{
+    "builders": [
+        {
+            "type": "azure-arm",
+            "managed_image_resource_group_name": "{{ user `rg_name` }}",
+            "managed_image_name": "{{ user `image_name_prefix` }}_vm_base_image_v{{user `version` }}",
+            "build_resource_group_name": "{{ user `rg_name` }}",
+            "virtual_network_resource_group_name": "{{ user `vnet_rg_name` }}",
+            "virtual_network_name": "{{ user `vnet_name` }}",
+            "virtual_network_subnet_name": "{{ user `vnet_subnet_name` }}",
+            "vm_size": "{{ user `builder_vm_size` }}",
+
+            "os_type": "Linux",
+            "image_publisher": "Canonical",
+            "image_offer": "UbuntuServer",
+            "image_sku": "18.04-LTS"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "script": "./scripts/setup.sh"
+        },
+        {
+            "type": "shell",
+            "script": "./scripts/ansible.sh"
+        },
+        {
+            "type": "shell",
+            "script": "./scripts/cleanup.sh"
+        }
+    ]
+}

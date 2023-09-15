@@ -1,0 +1,151 @@
+= Azure Linux VM images using Packer
+:toc:
+:icons: font
+:source-highlighter: coderay
+
+Steps to build azure virtual machine images using packer
+
+== Build images from your local machine
+
+To start work from a clean slate, create a resource group inside of which all the ephemeral azure resources (VM, disk, public ip ... ) will be created. This is merely done to run the packer builds inside this resource group rather than at the root of the subscription `/`. The resource group can be created from the CLI
+
+[#code-block-1]
+.Create Azure resource group using AzureCLI
+[source, bash]
+----
+az group create --location <location> --name <rg-name>
+----
+
+[#code-block-2]
+.Create Azure AD service principal scoped to the above resource group
+[source, sh]
+----
+rgId=$(az group show --name <rg-name> --query id --output tsv)
+az ad sp create-for-rbac --name <sp-name> --role <role> --scopes ${rgId} --query "{ client_id: appId, client_secret: password, tenant_id: tenant }"
+----
+
+.The above commands will yield an output similar to
+[source, sh]
+----
+{
+    "client_id": "<client-id>",
+    "client_secret": "<client-secret>",
+    "tenant_id": "<tenant_id>"
+}
+----
+
+.The subscription id of the account can be retrieved via
+[source, sh]
+----
+az account show --query "{ subscription_id: id }"
+----
+
+=== Packer build template
+
+Using the above credentials, a simple packer build can be run using the following template
+[source, json]
+----
+{
+  "builders": [{
+    "type": "azure-arm",
+
+    "client_id": "<client-id>",
+    "client_secret": "<client-secret>",
+    "tenant_id": "<tenant-id>",
+    "subscription_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx",
+
+    "managed_image_resource_group_name": "<rg-name>",
+    "managed_image_name": "myPackerImage",
+    "build_resource_group_name": "<rg-name>",
+
+    "os_type": "Linux",
+    "image_publisher": "Canonical",
+    "image_offer": "UbuntuServer",
+    "image_sku": "16.04-LTS",
+
+    "azure_tags": {
+        "dept": "Engineering",
+        "task": "Image deployment"
+    },
+
+    "location": "East US",
+    "vm_size": "Standard_DS2_v2"
+  }],
+  "provisioners": [{
+    "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
+    "inline": [
+      "apt-get update",
+      "apt-get upgrade -y",
+      "apt-get -y install nginx",
+
+      "/usr/sbin/waagent -force -deprovision+user && export HISTSIZE=0 && sync"
+    ],
+    "inline_shebang": "/bin/sh -x",
+    "type": "shell"
+  }]
+}
+----
+
+This will fire up a packer build inside the resource group `<rg-name>` that the service principal is scoped for. Packer will delete all azure resources that it spins up for creating the VM image, but not the resource group as it was created external to the packer build.
+
+In this process, packer will create a public IP resource which in some cases may not be preferred. In this case, the packer builds can be run from within a VM in azure. For this to happen, the VM running packer must be configured properly with the right `managed indenties` so that packer has the proper access rights and permissions to succesfully provision resources, connect to VM's using their private IP and create VM images.
+
+== Packer with Managed Identity
+
+In order to run packer builds on Azure VM we need to ensure that the VM being used for the packer builds has all the necessary roles and access right to various azure resources. We can configure this by attaching a *managed identity* to the VM that will grant the necessary permissions to packer to run builds successfully. The main reason to do this is to avoid having to create a public IP resource since in some cases, this may not be allowed.
+
+=== Packer VM on azure
+
+To bootstrap a packer builder VM instance, simply run the provided terraform template. The template will spin up a isolated resource group `pkrws` (packer workspace) and launch all the necessary Azure resources inside of it. The `custom_data` directory contains the `cloud-init` configuration steps that run as the VM boots and provisions it with the Packer binary.
+
+.The terraform deployment provisions the following resources
+* Azure Resource Group: `pkrws` (packer workspace)
+* Azure Virtual Network: 'pkr_vnet', Default address prefix: `10.0.0.0/24`
+** A Azure virtual network to logically isolate packer VM's with potentially other VMs
+* Two azure subnets: `pkr_frontend` and `pkr_backend`
+** `pkr_frontend` subnet hosts the public facing packer builder VM. This is the VM from which packer runs all its builds
+*** Default address prefix: `10.0.0.0/25`
+** `pkr_backend` subnet is created to host the ephemeral VMs launched by packer during builds. This is done to avoid the need for creating an ephemeral public IP resource by packer each time it builds VM images
+*** Default address prefix: `10.0.0.128/25`
+* A azure network security group
+** This network security group is attached to the `pkr_frontend` subnet to control the inbound network traffic
+** By default all incoming network traffic is block except from a single source IP (user's source IP). This IP address has to be provided as an input variable to terraform
+* A public IP resource to connect to the packer builder VM
+* A VM network interface to which the public IP is attached
+* A storage account to store the VM boot diagnostics
+* Azure VM
+** Default size: `Standard_DS1_v2`
+** Ubuntu base image
+** Public ssh key is copied from location specified by the input variable `packer_builder_vm_access_key`
+
+
+After a successful build, the dynamically generated public ip attached to the VM is printed out to the screen. To bootstrap the packer builder VM, the following is to be executed
+
+[source, bash]
+----
+cd ./terraform
+terraform init
+terraform validate (optional)
+terraform apply
+----
+
+=== Managed Identity
+
+In order to run packer builds on Azure VM's its convenient to assign a *managed identity* to the host VM. This can be easily done in the terraform scripts via the `azurerm_role_assignment` resource.
+
+[source, hcl]
+----
+data "azurerm_role_definition" "builtin_role_contributor" {
+  name = "Contributor"
+}
+
+data "azurerm_role_definition" "builtin_role_reader" {
+  name = "Reader"
+}
+
+resource "azurerm_role_assignment" "vm_role_assign" {
+  scope = <scope within which the managed identity has effect>
+  principal_id = <application id of the resource to which the role is to be assigned>
+  role_definition_name = <name of the builtin azure role to be assigned to the resource>
+}
+----
