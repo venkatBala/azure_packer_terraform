@@ -1,0 +1,110 @@
+---
+- name: Create installation directory if it does not exists
+  file:
+    path: "{{ GCC_INSTALL_PREFIX }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+
+- name: Setup working directory if it does not exist
+  file:
+    path: "{{ WORKDIR }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+
+- name: Create build directories
+  file:
+    path: "{{ WORKDIR }}/{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  with_items:
+    - "{{ GCC_NVPTX_BUILD_DIR }}"
+    - "{{ GCC_HOST_BUILD_DIR }}"
+
+- name: Clone nvptx tools into work dir
+  git:
+    repo: "{{ NVPTX_TOOLS }}"
+    dest: "{{ WORKDIR }}/nvptx-tools"
+  register: git_clone_nvptx_tools
+
+- name: Clone nvptx newlib into workdir
+  git:
+    repo: "{{ NVPTX_NEWLIB }}"
+    dest: "{{ WORKDIR }}/nvptx-newlib"
+  register: git_clone_nvptx_newlib
+
+- name: Get GCC source tree
+  unarchive:
+    src: "{{ GCC_TARBALL_URL }}"
+    dest: "{{ WORKDIR }}"
+    remote_src: yes
+
+- name: Download GCC pre-requisities
+  command: contrib/download_prerequisites
+  args:
+    chdir: "{{ WORKDIR }}/gcc-{{ VERSION }}"
+
+- name: Create symlink to nvptx-newlib
+  file:
+    src: "{{ WORKDIR }}/nvptx-newlib/newlib"
+    dest: "{{ WORKDIR }}/gcc-{{ VERSION }}/newlib"
+    state: link
+  
+- name: Configure, compile and install nvptx
+  command: "{{ item }}"
+  args:
+    chdir: "{{ WORKDIR }}/nvptx-tools"
+  with_items:
+    - ./configure --prefix "{{ GCC_INSTALL_PREFIX }}"
+    - make -j 4
+    - make install
+
+- name: Configure, make and install GCC accelerator
+  command: "{{ item }}"
+  args:
+    chdir: "{{ WORKDIR }}/{{ GCC_NVPTX_BUILD_DIR }}"
+  with_items:
+    - >- 
+      ../gcc-{{ VERSION }}/configure --prefix={{ GCC_INSTALL_PREFIX }}
+      --enable-as-accelerator-for={{ COMPILE_TARGET }}
+      --with-build-time-tools={{ GCC_INSTALL_PREFIX }}/nvptx-none/bin
+      --disable-sjlj-exceptions
+      --enable-newlib-io-long-long
+      --enable-languages='c,c++,fortran'
+      --target=nvptx-none
+    - make -j
+    - make install
+
+- name: Configure, make and install GCC for host
+  command: "{{ item }}"
+  args:
+    chdir: "{{ WORKDIR }}/{{ GCC_HOST_BUILD_DIR }}"
+  with_items:
+    - >-
+      ../gcc-{{ VERSION }}/configure --prefix={{ GCC_INSTALL_PREFIX }}
+      --build={{ COMPILE_TARGET }}
+      --host={{ COMPILE_TARGET }}
+      --target={{ COMPILE_TARGET }}
+      --enable-offload-targets=nvptx-none={{ GCC_INSTALL_PREFIX }}/nvptx-none
+      --enable-langugages='c,c++,fortran'
+      --disable-multilib
+    - make -j
+    - make install
+
+- name: Setup gcc modulefile directory
+  file:
+    path: /usr/local/tools/modulefiles/gcc
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+
+- name: Setup the modulefile
+  copy:
+    src: modulefile
+    dest: /usr/local/tools/modulefiles/gcc/10.1.0

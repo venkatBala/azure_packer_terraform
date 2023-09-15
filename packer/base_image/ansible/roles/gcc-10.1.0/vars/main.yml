@@ -1,0 +1,10 @@
+---
+VERSION: 10.1.0
+COMPILE_TARGET: x86_64-pc-linux-gnu
+GCC_INSTALL_PREFIX: /usr/local/tools/gcc/10.1.0
+WORKDIR: /tmp/compile_gcc_toolkit
+GCC_TARBALL_URL: https://ftp.gnu.org/gnu/gcc/gcc-10.1.0/gcc-10.1.0.tar.gz
+NVPTX_TOOLS: https://github.com/MentorEmbedded/nvptx-tools
+NVPTX_NEWLIB: https://github.com/MentorEmbedded/nvptx-newlib
+GCC_NVPTX_BUILD_DIR: build-nvptx-gcc
+GCC_HOST_BUILD_DIR: build-host-gcc

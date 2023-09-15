@@ -1,0 +1,20 @@
+%Module1.0#
+
+proc ModulesHelp {} {
+    puts stderr "\tOpenMPI\n"
+    puts stderr "\tThis module loads OpenMPI 4.0.3\n"
+}
+
+module-whatis "loads Openmpi 4.0.3"
+
+set version 4.0.3
+set prefix /usr/local/tools/openmpi
+
+prepend-path PATH               $prefix/$version/bin
+prepend-path LD_LIBRARY_PATH    $prefix/$version/lib
+prepend-path LIBRARY_PATH       $prefix/$version/lib
+prepend-path CPATH              $prefix/$version/include
+setenv MPI_HOME                 $prefix/$version
+setenv MPI_LIB                  $prefix/$version/lib
+setenv MPI_INCLUDE              $prefix/$version/include
+setenv MPI_SYSCONFIG            $prefix/$version/etc

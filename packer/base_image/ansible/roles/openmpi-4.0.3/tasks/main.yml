@@ -1,0 +1,41 @@
+---
+- name: Setup working directory
+  file:
+    path: "{{ WORKDIR }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ DIR_MODE }}"
+
+- name: Create install prefix
+  file:
+    path: "{{ INSTALL_PREFIX }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ DIR_MODE }}"
+
+- name: Get openmpi sources
+  unarchive:
+    src: "{{ SRC_URL }}"
+    dest: "{{ WORKDIR }}"
+    remote_src: yes
+
+- name: configure openmpi
+  command: "{{ item }}"
+  args:
+    chdir: "{{ WORKDIR }}/openmpi-{{ OPENMPI_VERSION }}"
+  with_items:
+    - ./configure --prefix "{{ INSTALL_PREFIX }}"
+
+- name: Build and install Openmpi
+  make:
+    chdir: "{{ WORKDIR }}/openmpi-{{ OPENMPI_VERSION }}"
+    target: install
+    params:
+      NUM_THREADS: 8
+
+- name: Setup the modulefile
+  copy:
+    src: modulefile
+    dest: /usr/local/tools/openmpi/{{ OPENMPI_VERSION }}

@@ -1,0 +1,32 @@
+#%Module1.0######################################################################
+##
+##
+proc ModulesHelp { } {
+        global version GCChome
+
+puts stderr "\tGCC\n"
+puts stderr "\tThis module loads gfortran/gcc/g++ version 10.1.0.\n"
+}
+
+module-whatis "loads GCC Compiler Environment version 10.1.0"
+
+# for Tcl script use only
+set    version        10.1.0
+set    GCChome        /usr/local/tools/gcc/$version
+
+setenv CC /usr/local/tools/gcc/$version/bin/gcc
+setenv CXX /usr/local/tools/gcc/$version/bin/g++
+
+prepend-path    PATH                    /usr/local/tools/gcc/$version/bin
+prepend-path    INCLUDE                 /usr/local/tools/gcc/$version/include
+prepend-path    CPATH                   /usr/local/tools/gcc/$version/include
+prepend-path    LD_LIBRARY_PATH         /usr/local/tools/gcc/10.1.0/lib
+prepend-path    LD_LIBRARY_PATH         /usr/local/tools/gcc/10.1.0/lib64
+prepend-path    LIBRARY_PATH            /usr/local/tools/gcc/10.1.0/lib
+prepend-path    LIBRARY_PATH            /usr/local/tools/gcc/10.1.0/lib64
+prepend-path    MANPATH                 /usr/local/tools/gcc/10.1.0/share/man
+prepend-path    CPLUS_INCLUDE_PATH      /usr/local/tools/gcc/10.1.0/include/c++/10.1.0
+prepend-path    CPLUS_INCLUDE_PATH      /usr/local/tools/gcc/10.1.0/c++/10.1.0/x86_64-pc-linux-gnu
+
+# for Tcl script use only
+set     dotversion      10.1.0

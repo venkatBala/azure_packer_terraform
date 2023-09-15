@@ -1,0 +1,9 @@
+---
+- name: Setup the HPC base image
+  hosts: all
+  become: yes
+
+  roles:
+    - environment-modules
+    - gcc-10.1.0
+    - openmpi-4.0.3

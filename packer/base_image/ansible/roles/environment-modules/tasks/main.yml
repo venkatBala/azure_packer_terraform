@@ -1,0 +1,25 @@
+---
+  - name: Install environment modules from apt
+    apt:
+      name: environment-modules
+      state: present
+
+  - name: source module profile.sh
+    copy:
+      src: /usr/share/modules/init/profile.sh
+      dest: /etc/profile.d/profile.sh
+      remote_src: yes
+
+  - name: Configure user environments for non standard module locations
+    blockinfile:
+      path: /etc/profile
+      block: |
+        module use /usr/local/tools/modulefiles
+
+  - name: Create custom location for modulefiles
+    file:
+      path: /usr/local/tools/modulefiles
+      state: directory
+      owner: root
+      group: root
+      mode: "0755"

@@ -1,0 +1,9 @@
+---
+- name: Install environment modules and dependencies
+  apt:
+    name: "{{ item }}"
+    state: present
+    with_items:
+      - tcl
+      - tcl-dev
+      - environment-modules
