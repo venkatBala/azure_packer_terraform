@@ -1,0 +1,58 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - unzip
+  - git
+  - build-essential
+  - cmake
+  - htop
+  - bmon
+  - ca-certificates
+  - curl
+  - apt-transport-https
+  - lsb-release
+  - gnupg
+
+write_files:
+  - owner: root:root
+    permissions: 0700
+    path: /tmp/install_packer.sh
+    content: |
+      #!/bin/bash
+      set -eou
+
+      mkdir -p /tmp/packer_install
+      cd /tmp/packer_install
+      wget https://releases.hashicorp.com/packer/1.5.6/packer_1.5.6_linux_amd64.zip
+      unzip packer_1.5.6_linux_amd64.zip
+      mv packer /usr/local/bin/packer
+      cd /tmp
+
+      # Cleanup
+      rm -rf packer_install
+
+  - owner: root:root
+    permissions: 0700
+    path: /tmp/install_azurecli.sh
+    content: |
+      #!/bin/bash
+      set -eou
+
+      mkdir -p /tmp/install_azurecli
+      cd /tmp/install_azurecli
+      curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc.gpg > /dev/null
+
+      AZ_REPO=$(lsb_release -cs)
+      echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | sudo tee /etc/apt/sources.list.d/azure-cli.list
+
+      sudo apt-get update
+      sudo apt-get install -y azure-cli
+      cd /tmp
+      rm -rf install_azurecli
+
+runcmd:
+  - [/tmp/install_packer.sh]
+  - [/tmp/install_azurecli.sh]
+
